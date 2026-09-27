@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ZapAgent - Narrated Demo</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, sans-serif;
+    background: #09090B;
+    color: #FAFAFA;
+    overflow: hidden;
+    width: 100vw;
+    height: 100vh;
+  }
+
+  .slide {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.8s ease, transform 0.8s ease;
+    padding: 60px 80px;
+    pointer-events: none;
+  }
+  .slide.active {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: auto;
+  }
+
+  /* Progress bar */
+  .progress-bar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 3px;
+    background: linear-gradient(90deg, #F7931A, #8B5CF6);
+    z-index: 100;
+    transition: width 0.3s linear;
+  }
+
+  /* Slide counter */
+  .slide-counter {
+    position: fixed;
+    bottom: 30px;
+    right: 40px;
+    font-size: 13px;
+    color: #52525B;
+    font-variant-numeric: tabular-nums;
+    z-index: 100;
+  }
+
+  /* Subtitle bar (narration text) */
+  .subtitle-bar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(0,0,0,0.85);
+    backdrop-filter: blur(12px);
+    border-top: 1px solid #27272A;
+    padding: 16px 60px;
+    z-index: 200;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .subtitle-text {
+    font-size: 16px;
+    color: #E4E4E7;
+    text-align: center;
+    line-height: 1.5;
+    max-width: 800px;
+  }
+  .subtitle-text .highlight {
+    color: #F7931A;
+    font-weight: 600;
+  }
+
+  /* Speaking indicator */
+  .speaking-indicator {
+    position: fixed;
+    top: 20px;
+    right: 30px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(247,147,26,0.08);
+    border: 1px solid rgba(247,147,26,0.15);
+    border-radius: 20px;
+    padding: 6px 14px;
+    font-size: 12px;
+    color: #F7931A;
+    font-weight: 500;
+    z-index: 100;
+  }
+  @keyframes sound-wave {
+    0%, 100% { height: 4px; }
+    50% { height: 14px; }
+  }
+  .wave-bar {
+    width: 3px;
+    background: #F7931A;
+    border-radius: 2px;
+    animation: sound-wave 0.6s ease-in-out infinite;
+  }
+  .wave-bar:nth-child(2) { animation-delay: 0.1s; }
+  .wave-bar:nth-child(3) { animation-delay: 0.2s; }
+  .wave-bar:nth-child(4) { animation-delay: 0.3s; }
+  .wave-bar.paused { animation-play-state: paused; height: 4px; }
+
+  /* Start overlay */
+  .start-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.9);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 500;
+    transition: opacity 0.5s ease;
+  }
+  .start-overlay.hidden {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .start-btn {
+    background: #F7931A;
+    color: #09090B;
+    border: none;
+    padding: 16px 48px;
+    border-radius: 12px;
+    font-size: 18px;
+    font-weight: 700;
+    cursor: pointer;
+    font-family: inherit;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    box-shadow: 0 0 40px rgba(247,147,26,0.3);
+  }
+  .start-btn:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 60px rgba(247,147,26,0.4);
+  }
+  .start-hint {
+    margin-top: 16px;
+    font-size: 13px;
+    color: #52525B;
+  }
+
+  /* Colors */
+  .orange { color: #F7931A; }
+  .purple { color: #8B5CF6; }
+  .green { color: #22C55E; }
+  .cyan { color: #06B6D4; }
+  .muted { color: #71717A; }
+  .dimmed { color: #A1A1AA; }
+  .red { color: #EF4444; }
+
+  .tag {
+    display: inline-block;
+    padding: 4px 14px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    margin-bottom: 24px;
+  }
+  .tag-orange { background: rgba(247,147,26,0.12); color: #F7931A; border: 1px solid rgba(247,147,26,0.2); }
+  .tag-purple { background: rgba(139,92,246,0.12); color: #8B5CF6; border: 1px solid rgba(139,92,246,0.2); }
+  .tag-green { background: rgba(34,197,94,0.12); color: #22C55E; border: 1px solid rgba(34,197,94,0.2); }
+  .tag-cyan { background: rgba(6,182,212,0.12); color: #06B6D4; border: 1px solid rgba(6,182,212,0.2); }
+
+  h1 { font-size: 72px; font-weight: 800; line-height: 1.05; letter-spacing: -2px; margin-bottom: 20px; text-align: center; }
+  h2 { font-size: 48px; font-weight: 700; line-height: 1.15; letter-spacing: -1px; margin-bottom: 16px; text-align: center; }
+  .subtitle { font-size: 20px; color: #A1A1AA; line-height: 1.5; text-align: center; max-width: 700px; }
+
+  /* Feature grid */
+  .feature-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 36px; max-width: 780px; width: 100%; }
+  .feature-card {
+    background: #111113; border: 1px solid #1E1E21; border-radius: 14px; padding: 24px;
+    opacity: 0; transform: translateY(20px); transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .feature-card.show { opacity: 1; transform: translateY(0); }
+  .feature-icon { width: 40px; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 20px; margin-bottom: 12px; }
+  .feature-card h4 { font-size: 15px; font-weight: 600; margin-bottom: 5px; }
+  .feature-card p { font-size: 12px; color: #71717A; line-height: 1.5; }
+
+  /* Tech stack */
+  .tech-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 36px; max-width: 720px; width: 100%; }
+  .tech-item {
+    background: #111113; border: 1px solid #1E1E21; border-radius: 12px; padding: 20px 16px; text-align: center;
+    opacity: 0; transform: scale(0.9); transition: opacity 0.4s ease, transform 0.4s ease;
+  }
+  .tech-item.show { opacity: 1; transform: scale(1); }
+  .tech-emoji { font-size: 28px; margin-bottom: 8px; }
+  .tech-name { font-size: 13px; font-weight: 600; margin-bottom: 2px; }
+  .tech-desc { font-size: 10px; color: #52525B; }
+
+  /* Flow */
+  .flow { display: flex; align-items: center; gap: 10px; margin-top: 36px; flex-wrap: wrap; justify-content: center; }
+  .flow-step {
+    background: #111113; border: 1px solid #27272A; border-radius: 12px; padding: 16px 20px; text-align: center; min-width: 130px;
+    opacity: 0; transform: translateX(-20px); transition: opacity 0.5s ease, transform 0.5s ease;
+  }
+  .flow-step.show { opacity: 1; transform: translateX(0); }
+  .flow-arrow { font-size: 18px; color: #3F3F46; opacity: 0; transition: opacity 0.3s ease; }
+  .flow-arrow.show { opacity: 1; }
+  .flow-step-num { font-size: 9px; font-weight: 700; color: #52525B; text-transform: uppercase; letter-spacing: 1.5px; margin-bottom: 5px; }
+  .flow-step-label { font-size: 13px; font-weight: 600; }
+  .flow-step-sub { font-size: 10px; color: #52525B; margin-top: 3px; }
+
+  /* Stats */
+  .stats-row { display: flex; gap: 50px; margin-top: 40px; }
+  .stat { text-align: center; opacity: 0; transform: translateY(20px); transition: opacity 0.5s ease, transform 0.5s ease; }
+  .stat.show { opacity: 1; transform: translateY(0); }
+  .stat-num { font-size: 48px; font-weight: 800; letter-spacing: -1px; }
+  .stat-label { font-size: 12px; color: #52525B; margin-top: 3px; text-transform: uppercase; letter-spacing: 1px; font-weight: 500; }
+
+  .glow-orange { text-shadow: 0 0 60px rgba(247,147,26,0.3); }
+
+  .logo-big {
+    width: 90px; height: 90px; border-radius: 22px;
+    background: rgba(247,147,26,0.1); border: 1px solid rgba(247,147,26,0.2);
+    display: flex; align-items: center; justify-content: center; font-size: 44px; margin-bottom: 26px;
+  }
+
+  .bg-grid {
+    position: fixed; inset: 0;
+    background-image: linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+    background-size: 60px 60px; pointer-events: none; z-index: 0;
+  }
+  .bg-orb { position: fixed; width: 500px; height: 500px; border-radius: 50%; filter: blur(120px); opacity: 0.06; pointer-events: none; z-index: 0; }
+  .bg-orb-1 { background: #F7931A; top: -200px; right: -100px; }
+  .bg-orb-2 { background: #8B5CF6; bottom: -200px; left: -100px; }
+</style>
+</head>
+<body>
+
+<div class="bg-grid"></div>
+<div class="bg-orb bg-orb-1"></div>
+<div class="bg-orb bg-orb-2"></div>
+
+<div class="progress-bar" id="progress"></div>
+<div class="slide-counter" id="counter">1 / 9</div>
+
+<!-- Speaking indicator -->
+<div class="speaking-indicator" id="speakingInd">
+  <div class="wave-bar" id="w1"></div>
+  <div class="wave-bar" id="w2"></div>
+  <div class="wave-bar" id="w3"></div>
+  <div class="wave-bar" id="w4"></div>
+  <span>Narrating</span>
+</div>
+
+<!-- Subtitle bar -->
+<div class="subtitle-bar">
+  <div class="subtitle-text" id="subtitleText"></div>
+</div>
+
+<!-- Start overlay -->
+<div class="start-overlay" id="startOverlay">
+  <div class="logo-big">⚡</div>
+  <h2 style="margin-bottom: 8px;">ZapAgent Demo</h2>
+  <p class="dimmed" style="margin-bottom: 30px; font-size: 14px;">Auto-narrated presentation — press play and screen record!</p>
+  <button class="start-btn" id="startBtn" onclick="startPresentation()">▶ Start Narrated Demo</button>
+  <p class="start-hint">Make sure your volume is ON. Click to begin.</p>
+</div>
+
+<!-- ═══════ SLIDE 1: Intro ═══════ -->
+<div class="slide active" id="s0">
+  <div class="logo-big">⚡</div>
+  <h1><span class="orange glow-orange">Zap</span>Agent</h1>
+  <p class="subtitle">Autonomous AI Agent powered by Bitcoin Lightning &amp; Nostr Protocol</p>
+  <div style="margin-top: 28px; display: flex; gap: 12px;">
+    <span class="tag tag-orange">Bitcoin</span>
+    <span class="tag tag-purple">Nostr</span>
+    <span class="tag tag-cyan">AI Agent</span>
+  </div>
+</div>
+
+<!-- ═══════ SLIDE 2: What is ZapAgent ═══════ -->
+<div class="slide" id="s1">
+  <span class="tag tag-orange">Introduction</span>
+  <h2>What is <span class="orange">ZapAgent</span>?</h2>
+  <p class="subtitle">The first AI agent that owns its identity on Nostr, thinks with Google Gemini AI, and pays for its own compute using Bitcoin Lightning micropayments — with zero middlemen.</p>
+  <div style="margin-top: 30px; display: flex; gap: 20px;">
+    <div style="text-align:center;"><div style="font-size:36px;">🪪</div><p class="dimmed" style="font-size:12px; margin-top:4px;">Own Identity</p></div>
+    <div style="text-align:center;"><div style="font-size:36px;">🧠</div><p class="dimmed" style="font-size:12px; margin-top:4px;">AI Brain</p></div>
+    <div style="text-align:center;"><div style="font-size:36px;">⚡</div><p class="dimmed" style="font-size:12px; margin-top:4px;">Self-Financing</p></div>
+    <div style="text-align:center;"><div style="font-size:36px;">📡</div><p class="dimmed" style="font-size:12px; margin-top:4px;">Decentralized</p></div>
+  </div>
+</div>
+
+<!-- ═══════ SLIDE 3: Problem ═══════ -->
+<div class="slide" id="s2">
+  <span class="tag tag-purple">The Problem</span>
+  <h2>Why We Built <span class="purple">This</span></h2>
+  <div class="feature-grid">
+    <div class="feature-card" id="f2a">
+      <div class="feature-icon" style="background: rgba(239,68,68,0.1);">🔒</div>
+      <h4 class="red">KYC-Gated APIs</h4>
+      <p>AI agents need platform accounts, credit cards, and identity verification just to call an API.</p>
+    </div>
+    <div class="feature-card" id="f2b">
+      <div class="feature-icon" style="background: rgba(239,68,68,0.1);">🚫</div>
+      <h4 class="red">No Financial Freedom</h4>
+      <p>Agents cannot earn, save, or spend money. They fully depend on their human operators.</p>
+    </div>
+    <div class="feature-card" id="f2c">
+      <div class="feature-icon" style="background: rgba(239,68,68,0.1);">🏢</div>
+      <h4 class="red">Platform Lock-in</h4>
+      <p>Agent identities are owned by platforms. Switch provider and you lose everything.</p>
+    </div>
+    <div class="feature-card" id="f2d">
+      <div class="feature-icon" style="background: rgba(239,68,68,0.1);">💸</div>
+      <h4 class="red">Expensive Payments</h4>
+      <p>Stripe charges 2.9% + 30 cents. Micropayments of 1 sat are completely impossible.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ SLIDE 4: Solution ═══════ -->
+<div class="slide" id="s3">
+  <span class="tag tag-green">Our Solution</span>
+  <h2>ZapAgent = <span class="green">Sovereignty</span></h2>
+  <div class="feature-grid">
+    <div class="feature-card" id="f3a">
+      <div class="feature-icon" style="background: rgba(139,92,246,0.1);">🪪</div>
+      <h4 class="purple">Nostr Identity</h4>
+      <p>Owns its own cryptographic keypair. No platform lock-in. Portable across the Nostr network.</p>
+    </div>
+    <div class="feature-card" id="f3b">
+      <div class="feature-icon" style="background: rgba(247,147,26,0.1);">⚡</div>
+      <h4 class="orange">Lightning Wallet</h4>
+      <p>Holds Bitcoin sats. Earns by completing jobs. Pays for compute via L402 micropayments.</p>
+    </div>
+    <div class="feature-card" id="f3c">
+      <div class="feature-icon" style="background: rgba(6,182,212,0.1);">🧠</div>
+      <h4 class="cyan">AI Brain</h4>
+      <p>Multi-step chain-of-thought reasoning powered by Google Gemini. Transparent thought trace.</p>
+    </div>
+    <div class="feature-card" id="f3d">
+      <div class="feature-icon" style="background: rgba(34,197,94,0.1);">📡</div>
+      <h4 class="green">NIP-90 DVM</h4>
+      <p>Data Vending Machine protocol. Receives jobs from relays, processes them, publishes signed results.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ SLIDE 5: How It Works ═══════ -->
+<div class="slide" id="s4">
+  <span class="tag tag-cyan">Architecture</span>
+  <h2>How It <span class="cyan">Works</span></h2>
+  <div class="flow" style="margin-top: 44px;">
+    <div class="flow-step" id="fs1" style="border-color: #8B5CF6;">
+      <div class="flow-step-num purple">Step 1</div>
+      <div class="flow-step-label">📡 Job Request</div>
+      <div class="flow-step-sub">NIP-90 Kind 5000 from relay</div>
+    </div>
+    <div class="flow-arrow" id="fa1">→</div>
+    <div class="flow-step" id="fs2" style="border-color: #F7931A;">
+      <div class="flow-step-num orange">Step 2</div>
+      <div class="flow-step-label">⚡ Payment</div>
+      <div class="flow-step-sub">Lightning invoice via NWC</div>
+    </div>
+    <div class="flow-arrow" id="fa2">→</div>
+    <div class="flow-step" id="fs3" style="border-color: #06B6D4;">
+      <div class="flow-step-num cyan">Step 3</div>
+      <div class="flow-step-label">🧠 AI Reasoning</div>
+      <div class="flow-step-sub">Gemini chain-of-thought</div>
+    </div>
+    <div class="flow-arrow" id="fa3">→</div>
+    <div class="flow-step" id="fs4" style="border-color: #22C55E;">
+      <div class="flow-step-num green">Step 4</div>
+      <div class="flow-step-label">✅ Publish</div>
+      <div class="flow-step-sub">BIP-340 signed to relays</div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ SLIDE 6: Tech Stack ═══════ -->
+<div class="slide" id="s5">
+  <span class="tag tag-purple">Tech Stack</span>
+  <h2>What We <span class="purple">Used</span></h2>
+  <div class="tech-grid">
+    <div class="tech-item" id="t1"><div class="tech-emoji">🐍</div><div class="tech-name">Python + FastAPI</div><div class="tech-desc">Backend API Server</div></div>
+    <div class="tech-item" id="t2"><div class="tech-emoji">⚛️</div><div class="tech-name">React + TypeScript</div><div class="tech-desc">Frontend Dashboard</div></div>
+    <div class="tech-item" id="t3"><div class="tech-emoji">🤖</div><div class="tech-name">Google Gemini 1.5</div><div class="tech-desc">AI Reasoning Engine</div></div>
+    <div class="tech-item" id="t4"><div class="tech-emoji">⚡</div><div class="tech-name">Lightning Network</div><div class="tech-desc">Bitcoin Micropayments</div></div>
+    <div class="tech-item" id="t5"><div class="tech-emoji">📡</div><div class="tech-name">Nostr + WebSocket</div><div class="tech-desc">Decentralized Protocol</div></div>
+    <div class="tech-item" id="t6"><div class="tech-emoji">🔐</div><div class="tech-name">BIP-340 Schnorr</div><div class="tech-desc">Cryptographic Signing</div></div>
+    <div class="tech-item" id="t7"><div class="tech-emoji">🌊</div><div class="tech-name">Tailwind CSS v4</div><div class="tech-desc">UI Framework</div></div>
+    <div class="tech-item" id="t8"><div class="tech-emoji">📋</div><div class="tech-name">NIP-90 / NIP-47</div><div class="tech-desc">Nostr Standards</div></div>
+    <div class="tech-item" id="t9"><div class="tech-emoji">🔄</div><div class="tech-name">L402 Protocol</div><div class="tech-desc">HTTP Micropayments</div></div>
+  </div>
+</div>
+
+<!-- ═══════ SLIDE 7: Features ═══════ -->
+<div class="slide" id="s6">
+  <span class="tag tag-orange">Key Features</span>
+  <h2>What It <span class="orange">Does</span></h2>
+  <div class="feature-grid" style="grid-template-columns: 1fr 1fr 1fr; max-width: 880px;">
+    <div class="feature-card" id="f6a">
+      <div class="feature-icon" style="background: rgba(247,147,26,0.1);">💰</div>
+      <h4 class="orange">Self-Financing</h4>
+      <p>Earns sats by solving jobs, spends sats on AI compute. Autonomous economy.</p>
+    </div>
+    <div class="feature-card" id="f6b">
+      <div class="feature-icon" style="background: rgba(139,92,246,0.1);">🔑</div>
+      <h4 class="purple">Own Identity</h4>
+      <p>Generates Nostr keypair. No registration, no KYC, no dependency.</p>
+    </div>
+    <div class="feature-card" id="f6c">
+      <div class="feature-icon" style="background: rgba(6,182,212,0.1);">🧠</div>
+      <h4 class="cyan">Transparent AI</h4>
+      <p>Full chain-of-thought trace. See exactly how the agent reasons.</p>
+    </div>
+    <div class="feature-card" id="f6d">
+      <div class="feature-icon" style="background: rgba(34,197,94,0.1);">✍️</div>
+      <h4 class="green">Signed Proofs</h4>
+      <p>Every output cryptographically signed with BIP-340 Schnorr.</p>
+    </div>
+    <div class="feature-card" id="f6e">
+      <div class="feature-icon" style="background: rgba(247,147,26,0.1);">📡</div>
+      <h4 class="orange">Multi-Relay</h4>
+      <p>Publishes to 4+ Nostr relays. Censorship-resistant distribution.</p>
+    </div>
+    <div class="feature-card" id="f6f">
+      <div class="feature-icon" style="background: rgba(139,92,246,0.1);">📊</div>
+      <h4 class="purple">Live Dashboard</h4>
+      <p>Real-time WebSocket telemetry. Watch events as they happen.</p>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ SLIDE 8: Stats ═══════ -->
+<div class="slide" id="s7">
+  <span class="tag tag-green">By The Numbers</span>
+  <h2>Project <span class="green">Stats</span></h2>
+  <div class="stats-row">
+    <div class="stat" id="st1"><div class="stat-num orange">5</div><div class="stat-label">Backend Modules</div></div>
+    <div class="stat" id="st2"><div class="stat-num purple">4</div><div class="stat-label">Nostr Relays</div></div>
+    <div class="stat" id="st3"><div class="stat-num cyan">21</div><div class="stat-label">Sats per Job</div></div>
+    <div class="stat" id="st4"><div class="stat-num green">100%</div><div class="stat-label">Sovereign</div></div>
+  </div>
+  <div style="margin-top: 44px; max-width: 580px; text-align: center;">
+    <p class="dimmed" style="font-size: 15px; line-height: 1.7;">Zero KYC. Zero platform lock-in. Zero middlemen.<br>Just an AI, a Lightning wallet, and the open Nostr network.</p>
+  </div>
+</div>
+
+<!-- ═══════ SLIDE 9: Thank You ═══════ -->
+<div class="slide" id="s8">
+  <div class="logo-big">⚡</div>
+  <h1><span class="orange glow-orange">Zap</span>Agent</h1>
+  <p class="subtitle" style="margin-bottom: 24px;">Autonomous AI × Bitcoin Lightning × Nostr Protocol</p>
+  <div style="display:flex; gap: 14px; margin-top: 8px;">
+    <span class="tag tag-orange">BOSS Battle Hackathon 2026</span>
+  </div>
+  <p class="muted" style="margin-top: 36px; font-size: 14px;">Built by <span style="color:#FAFAFA; font-weight:600;">Anant Kumar</span></p>
+  <p class="muted" style="margin-top: 8px; font-size: 13px;">Thank you for watching! ⚡</p>
+</div>
+
+<script>
+  // ─── Narration Script ───
+  const narrations = [
+    // Slide 0: Intro
+    "Hello everyone! Welcome to ZapAgent. ZapAgent is the first autonomous AI agent that lives on Nostr, thinks with artificial intelligence, and pays for its own compute using Bitcoin Lightning micropayments. Let me walk you through what we built and how it works.",
+
+    // Slide 1: What is ZapAgent
+    "So what exactly is ZapAgent? It is a fully sovereign AI agent. It owns its own cryptographic identity on the Nostr network. It uses Google Gemini AI for intelligent reasoning. And most importantly — it can earn and spend Bitcoin satoshis completely on its own, with zero middlemen and zero KYC.",
+
+    // Slide 2: Problem
+    "Let me explain the problem we are solving. Today, every AI agent is trapped inside Big Tech platforms. They need KYC-gated API keys just to function. They have no financial autonomy — they cannot earn or spend money. Their identities are locked to platforms. And traditional payment systems like Stripe charge 2.9 percent plus 30 cents — making micropayments completely impossible.",
+
+    // Slide 3: Solution  
+    "ZapAgent solves all of these problems. First, it has its own Nostr identity — a cryptographic keypair with no platform lock-in. Second, it has a Lightning wallet that holds Bitcoin sats. It earns by completing jobs and pays for compute via L402 micropayments. Third, it has an AI brain powered by Google Gemini with full chain-of-thought reasoning. And fourth, it uses the NIP-90 Data Vending Machine protocol to receive and publish jobs on the decentralized Nostr network.",
+
+    // Slide 4: How it works
+    "Here is how ZapAgent works in 4 simple steps. Step 1: A job request arrives from a Nostr relay as a NIP-90 Kind 5000 event. Step 2: The agent creates a Lightning invoice and receives payment via Nostr Wallet Connect. Step 3: The AI engine processes the task using multi-step chain-of-thought reasoning with Google Gemini. Step 4: The result is cryptographically signed using BIP-340 Schnorr signatures and published back to multiple Nostr relays as a Kind 6000 event.",
+
+    // Slide 5: Tech Stack
+    "Let me show you what technologies we used to build ZapAgent. The backend is built with Python and FastAPI. The frontend dashboard uses React with TypeScript. For AI reasoning, we use Google Gemini 1.5 Flash. Payments are handled via Bitcoin Lightning Network. Communication happens over the Nostr protocol using WebSockets. All events are signed using BIP-340 Schnorr signatures on the secp256k1 curve. The UI is styled with Tailwind CSS version 4. We follow NIP-90 and NIP-47 Nostr standards. And we use the L402 protocol for HTTP micropayments.",
+
+    // Slide 6: Features
+    "Here are the key features of ZapAgent. Self-Financing — the agent earns sats by solving jobs and spends sats on AI compute, creating a fully autonomous economy. Own Identity — it generates its own Nostr keypair with no registration required. Transparent AI — you can see the full chain-of-thought reasoning trace for every job. Signed Proofs — every output is cryptographically signed and verifiable. Multi-Relay — results are published to 4 or more Nostr relays for censorship resistance. And a Live Dashboard — real-time WebSocket telemetry lets you watch everything happening live.",
+
+    // Slide 7: Stats
+    "Some quick stats about the project. We have 5 backend modules handling everything from AI to cryptography. The agent connects to 4 Nostr relays simultaneously. Each job costs just 21 satoshis — that is a fraction of a penny. And the agent is 100 percent sovereign — no KYC, no middlemen, no platform dependency. Just an AI, a Lightning wallet, and the open Nostr network.",
+
+    // Slide 8: Thank You
+    "Thank you so much for watching this demo of ZapAgent! This project was built for the BOSS Battle Hackathon 2026 by Bitshala. My name is Anant Kumar. If you have any questions or feedback, feel free to reach out. Don't forget to star the repo on GitHub. Thanks again — and keep zapping!"
+  ];
+
+  const slides = document.querySelectorAll('.slide');
+  const total = slides.length;
+  let current = 0;
+  let synth = window.speechSynthesis;
+
+  function showSlide(idx) {
+    slides.forEach(s => s.classList.remove('active'));
+    slides[idx].classList.add('active');
+    current = idx;
+    document.getElementById('counter').textContent = `${idx + 1} / ${total}`;
+    document.getElementById('progress').style.width = `${((idx + 1) / total) * 100}%`;
+    setTimeout(() => animateSlide(idx), 300);
+  }
+
+  function animateSlide(idx) {
+    const animMap = {
+      2: ['f2a','f2b','f2c','f2d'],
+      3: ['f3a','f3b','f3c','f3d'],
+      4: ['fs1','fa1','fs2','fa2','fs3','fa3','fs4'],
+      5: ['t1','t2','t3','t4','t5','t6','t7','t8','t9'],
+      6: ['f6a','f6b','f6c','f6d','f6e','f6f'],
+      7: ['st1','st2','st3','st4'],
+    };
+    const ids = animMap[idx];
+    if (ids) {
+      const delay = idx === 5 ? 100 : idx === 4 ? 200 : 180;
+      ids.forEach((id, i) => {
+        setTimeout(() => document.getElementById(id)?.classList.add('show'), i * delay);
+      });
+    }
+  }
+
+  function speak(text, onEnd) {
+    synth.cancel();
+    const utter = new SpeechSynthesisUtterance(text);
+    utter.rate = 0.95;
+    utter.pitch = 1.0;
+    utter.volume = 1.0;
+    utter.lang = 'en-US';
+
+    // Try to pick a good voice
+    const voices = synth.getVoices();
+    const preferred = voices.find(v => v.name.includes('Google') && v.lang.startsWith('en')) 
+      || voices.find(v => v.name.includes('David'))
+      || voices.find(v => v.name.includes('Mark'))
+      || voices.find(v => v.name.includes('Zira'))
+      || voices.find(v => v.lang.startsWith('en'));
+    if (preferred) utter.voice = preferred;
+
+    // Show subtitles word by word
+    const words = text.split(' ');
+    let wordIdx = 0;
+    const subEl = document.getElementById('subtitleText');
+    
+    utter.onboundary = (e) => {
+      if (e.name === 'word') {
+        // Show current chunk of words around the spoken word
+        const start = Math.max(0, wordIdx - 3);
+        const end = Math.min(words.length, wordIdx + 12);
+        const before = words.slice(start, wordIdx).join(' ');
+        const current = words[wordIdx] || '';
+        const after = words.slice(wordIdx + 1, end).join(' ');
+        subEl.innerHTML = `${before} <span class="highlight">${current}</span> ${after}`;
+        wordIdx++;
+      }
+    };
+
+    utter.onstart = () => {
+      subEl.textContent = words.slice(0, 10).join(' ');
+      setWavePaused(false);
+    };
+
+    utter.onend = () => {
+      setWavePaused(true);
+      setTimeout(() => {
+        subEl.textContent = '';
+        if (onEnd) onEnd();
+      }, 800);
+    };
+
+    synth.speak(utter);
+  }
+
+  function setWavePaused(paused) {
+    ['w1','w2','w3','w4'].forEach(id => {
+      const el = document.getElementById(id);
+      if (paused) el.classList.add('paused');
+      else el.classList.remove('paused');
+    });
+  }
+
+  function playSlide(idx) {
+    if (idx >= total) return;
+    showSlide(idx);
+    setTimeout(() => {
+      speak(narrations[idx], () => {
+        setTimeout(() => playSlide(idx + 1), 1200);
+      });
+    }, 600);
+  }
+
+  function startPresentation() {
+    document.getElementById('startOverlay').classList.add('hidden');
+    // Small delay then start
+    setTimeout(() => playSlide(0), 500);
+  }
+
+  // Load voices
+  if (synth.onvoiceschanged !== undefined) {
+    synth.onvoiceschanged = () => {};
+  }
+  // Preload voices
+  synth.getVoices();
+</script>
+
+</body>
+</html>
