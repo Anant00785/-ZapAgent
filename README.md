@@ -49,7 +49,7 @@ flowchart LR
 ## 🚀 Quick Start
 
 ### 1. Configure Environment
-Add your API key and wallet in `.env:
+Add your API key and wallet in .env:
 ```env
 GEMINI_API_KEY=your_gemini_key_here
 NWC_CONNECTION_URI=nostr+walletconnect://...
